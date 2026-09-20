@@ -1,0 +1,43 @@
+voiceVisualiser
+
+import { useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
+import * as THREE from 'three'
+
+interface DetroitRingProps {
+  status: 'ai_speaking' | 'user_speaking' | 'idle'
+}
+
+export default function DetroitRing({ status }: DetroitRingProps) {
+  const meshRef = useRef<THREE.Mesh>(null!)
+
+  // Smooth continuous spin like the Detroit: Become Human UI
+  useFrame((_, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.z += delta * 1.8
+    }
+  })
+
+  // Determine LED ring color based on interaction state
+  let ringColor = '#00e5ff' // Default Detroit Blue
+  if (status === 'user_speaking') ringColor = '#ffd000' // Yellow
+  if (status === 'idle') ringColor = '#00aaff'
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* Outer Glow Ring */}
+      <mesh ref={meshRef}>
+        <torusGeometry args={[1.2, 0.08, 16, 64, Math.PI * 1.6]} />
+        <meshStandardMaterial
+          color={ringColor}
+          emissive={ringColor}
+          emissiveIntensity={3}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Point light to cast glow onto future 3D face */}
+      <pointLight color={ringColor} intensity={2} distance={3} />
+    </group>
+  )
+}

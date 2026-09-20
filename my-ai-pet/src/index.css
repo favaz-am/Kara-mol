@@ -1,0 +1,43 @@
+/* src/index.css */
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  color: rgba(255, 255, 255, 0.87);
+}
+
+/* This is the magic that makes the React website invisible so the desktop shows through */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: transparent !important; 
+  overflow: hidden;
+}
+
+/* Optional: Removes the outline when you click your pet */
+* {
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* Add these at the bottom of index.css */
+
+.drag-region {
+  /* Tells Electron this area can be used to drag the window */
+  -webkit-app-region: drag; 
+}
+
+.no-drag {
+  /* Prevents the pet itself from interfering with the drag */
+  -webkit-app-region: no-drag; 
+}
+@keyframes breathe {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-4px) scale(1.02); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+.avatar-breathe {
+  animation: breathe 4s ease-in-out infinite;
+}
