@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { Canvas } from '@react-three/fiber'
 import { usePipecatClient, usePipecatClientMicControl } from '@pipecat-ai/client-react'
+import KaraModel from './KaraModel'
 import './index.css'
 
 export default function App() {
@@ -9,15 +11,22 @@ export default function App() {
   const client = usePipecatClient()
   const { enableMic } = usePipecatClientMicControl()
   
-  // NEW: A direct reference to the avatar image for high-speed animation
-  const avatarRef = useRef<HTMLImageElement>(null)
+  // High-speed refs to avoid React re-render lag
+  const ringRef = useRef<HTMLDivElement>(null)
+  const isBotSpeaking = useRef(false)
 
   // 1. Manage the connection state
   useEffect(() => {
     if (!client) return
 
     const handleStateChange = (state: string) => {
-      setIsConnected(state === 'connected' || state === 'ready')
+      const connected = state === 'connected' || state === 'ready'
+      setIsConnected(connected)
+      
+      // Set initial ring state when connecting/disconnecting
+      if (ringRef.current) {
+        ringRef.current.className = connected ? 'detroit-ring idle' : 'detroit-ring sleeping'
+      }
     }
     
     client.on('transportStateChanged', handleStateChange)
@@ -27,49 +36,48 @@ export default function App() {
     }
   }, [client])
 
-  // 2. DEBUGGING LOGS & SUPERCHARGED VOICE VISUALIZER
+  // 2. DETROIT RING LOGIC & PIPECAT EVENTS
   useEffect(() => {
     if (!client) return
     
-    const onBotStart = () => console.log('BOT STARTED SPEAKING')
-    const onBotStop = () => console.log('BOT STOPPED SPEAKING')
-    const onTrackStart = (track: any, participant: any) => console.log('TRACK STARTED', track, participant)
+    const onBotStart = () => {
+      isBotSpeaking.current = true
+      if (ringRef.current) ringRef.current.className = 'detroit-ring speaking' // Blue
+    }
     
-    // NEW: Real-time audio visualizer math
+    const onBotStop = () => {
+      isBotSpeaking.current = false
+      if (ringRef.current) ringRef.current.className = 'detroit-ring idle' // Dim Idle
+    }
+    
     const onLocalAudioLevel = (level: number) => {
-      if (avatarRef.current) {
-        // Multiply the tiny decimal by 800 to make it huge
-        const expansion = level * 800;
-        // Cap the max size so it doesn't cover your whole screen
-        const maxExpansion = Math.min(expansion, 80); 
+      // Don't interrupt the blue ring if the AI is currently talking
+      if (isBotSpeaking.current || !ringRef.current) return
 
-        if (level > 0.01) {
-          // When you are talking loudly
-          avatarRef.current.style.boxShadow = `0 0 ${20 + maxExpansion}px ${5 + (maxExpansion/2)}px rgba(0, 255, 204, 0.9)`;
-        } else {
-          // When you are quiet (Default green glow)
-          avatarRef.current.style.boxShadow = `0 0 20px 5px rgba(0, 255, 204, 0.6)`;
+      // If user volume crosses threshold, turn ring yellow
+      if (level > 0.02) {
+        ringRef.current.className = 'detroit-ring listening' // Yellow
+      } else {
+        if (ringRef.current.className !== 'detroit-ring idle') {
+          ringRef.current.className = 'detroit-ring idle' 
         }
       }
     }
 
     client.on('botStartedSpeaking', onBotStart)
     client.on('botStoppedSpeaking', onBotStop)
-    client.on('trackStarted', onTrackStart)
     client.on('localAudioLevel', onLocalAudioLevel) 
 
     return () => {
       client.off('botStartedSpeaking', onBotStart)
       client.off('botStoppedSpeaking', onBotStop)
-      client.off('trackStarted', onTrackStart)
       client.off('localAudioLevel', onLocalAudioLevel)
     }
   }, [client])
 
-  // 3. Track the active application via Electron
+  // 3. Track the active application
   useEffect(() => {
     const electron = (window as any).ipcRenderer
-    
     if (electron && electron.on) {
       electron.on('main-process-message', (_event: any, appName: string) => {
         setActiveApp(appName)
@@ -77,10 +85,9 @@ export default function App() {
     }
   }, [])
 
-  // 4. Handle connection & microphone
+  // 4. Handle connection
   const toggleConnection = async () => {
     if (!client) return 
-
     try {
       if (isConnected) {
         await client.disconnect()
@@ -90,46 +97,70 @@ export default function App() {
       }
     } catch (err) {
       console.error("Connection error:", err)
+      if (ringRef.current) ringRef.current.className = 'detroit-ring error' // Red on crash
     }
   }
 
   return (
-    <div
-      className="drag-region"
-      style={{
-        width: '100vw', height: '100vh', display: 'flex',
-        justifyContent: 'center', alignItems: 'center',
-      }}
-    >
-      <div
-        className="no-drag"
+    <div className="drag-region" style={{ width: '100vw', height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div 
+        className="no-drag" 
         style={{
-          width: '180px', height: '220px', borderRadius: '24px',
+          width: '180px', 
+          height: '220px', 
+          borderRadius: '24px',
           backgroundColor: isConnected ? 'rgba(0, 50, 20, 0.85)' : 'rgba(30, 30, 30, 0.85)',
-          border: '2px solid rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(8px)', color: '#ffffff',
-          display: 'flex', flexDirection: 'column',
-          justifyContent: 'center', alignItems: 'center',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-          userSelect: 'none', cursor: 'grab', textAlign: 'center', padding: '15px',
+          border: '2px solid rgba(255, 255, 255, 0.2)', 
+          backdropFilter: 'blur(8px)', 
+          color: '#ffffff',
+          display: 'flex', 
+          flexDirection: 'column', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)', 
+          userSelect: 'none', 
+          textAlign: 'center', 
+          padding: '15px',
           transition: 'background-color 0.4s ease'
         }}
       >
-        <img 
-          ref={avatarRef}
-          src="/ai-assistant.png" 
-          alt="AI Assistant"
-          className="avatar-breathe"
-          style={{
-            width: '90px', height: '90px', borderRadius: '50%', objectFit: 'cover',
-            // Default styles (overwritten by the useRef animation when connected)
-            boxShadow: isConnected ? '0 0 20px 5px rgba(0, 255, 204, 0.6)' : '0 4px 10px rgba(0,0,0,0.5)',
-            transition: 'box-shadow 0.05s linear', // Ultra-fast transition for smooth audio reactivity
-            marginBottom: '8px'
-          }} 
-        />
+        
+        {/* THE DETROIT RING WRAPPER */}
+        <div ref={ringRef} className="detroit-ring sleeping" style={{ marginBottom: '8px' }}>
+          {/* Circular 3D Viewport Window */}
+          <div 
+            style={{ 
+              width: '90px', 
+              height: '90px', 
+              borderRadius: '50%', 
+              overflow: 'hidden', 
+              background: '#121212',
+              position: 'relative',
+              zIndex: 2 
+            }}
+          >
+            <Suspense fallback={null}>
+            <Canvas
+  camera={{ position: [0, 0, 1.8], fov: 45 }}
+  gl={{ alpha: true, antialias: true }}
+>
+  {/* Soft ambient lighting all around */}
+  <ambientLight intensity={2.0} />
+
+  {/* Front key-light placed directly in front of her face */}
+  <directionalLight position={[0, 1, 2]} intensity={2.5} />
+
+  {/* Subtle rim light for Detroit sci-fi hair highlights */}
+  <directionalLight position={[-2, 2, -1]} intensity={1.5} color="#00e1ff" />
+
+  <KaraModel />
+</Canvas>
+            </Suspense>
+          </div>
+        </div>
 
         <p style={{ margin: '0', fontWeight: 'bold', fontSize: '14px' }}>
-          {isConnected ? 'Listening...' : 'Sleeping'}
+          {isConnected ? 'Online' : 'Sleeping'}
         </p>
         <p style={{ margin: '4px 0 10px', fontSize: '10px', color: '#00ffcc' }}>
           Watching: {activeApp}
@@ -138,9 +169,15 @@ export default function App() {
         <button
           onClick={toggleConnection}
           style={{
-            padding: '6px 14px', borderRadius: '12px', border: 'none',
-            backgroundColor: '#ffffff', color: '#000000', cursor: 'pointer',
-            fontSize: '12px', fontWeight: 'bold', transition: 'transform 0.1s'
+            padding: '6px 14px', 
+            borderRadius: '12px', 
+            border: 'none',
+            backgroundColor: '#ffffff', 
+            color: '#000000', 
+            cursor: 'pointer',
+            fontSize: '12px', 
+            fontWeight: 'bold', 
+            transition: 'transform 0.1s'
           }}
           onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
           onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}

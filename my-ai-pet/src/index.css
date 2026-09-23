@@ -41,3 +41,86 @@ html, body, #root {
 .avatar-breathe {
   animation: breathe 4s ease-in-out infinite;
 }
+
+/* --- Detroit: Become Human LED Ring --- */
+
+.detroit-ring {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  padding: 6px; /* Spacing for the ring thickness */
+  transition: all 0.3s ease;
+}
+
+/* The spinning segmented ring */
+.detroit-ring::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  transition: all 0.2s ease;
+  z-index: 1;
+}
+
+/* 0. SLEEPING (Disconnected, No Ring) */
+.detroit-ring.sleeping::before {
+  border-color: transparent;
+}
+
+/* 1. IDLE (Connected, Dim pulse, waiting for audio) */
+.detroit-ring.idle::before {
+  border-color: rgba(0, 195, 255, 0.3);
+  box-shadow: 0 0 10px rgba(0, 195, 255, 0.1);
+  animation: pulse-ring 3s infinite ease-in-out;
+}
+
+/* 2. LISTENING (User is talking - YELLOW) */
+.detroit-ring.listening::before {
+  border-color: rgba(255, 221, 0, 1);
+  border-top-color: transparent; /* Creates the broken ring look */
+  box-shadow: 0 0 15px rgba(255, 221, 0, 0.6), inset 0 0 10px rgba(255, 221, 0, 0.2);
+  animation: spin-ring 1.2s linear infinite;
+}
+
+/* 3. SPEAKING (AI is talking - BRIGHT BLUE) */
+.detroit-ring.speaking::before {
+  border-color: rgba(0, 225, 255, 1);
+  border-left-color: transparent;
+  border-right-color: transparent; /* Double broken ring for AI speaking */
+  box-shadow: 0 0 20px rgba(0, 225, 255, 0.8), inset 0 0 15px rgba(0, 225, 255, 0.5);
+  animation: spin-ring 0.8s linear infinite;
+}
+
+/* 4. ERROR (Red flash) */
+.detroit-ring.error::before {
+  border-color: rgba(255, 50, 50, 1);
+  box-shadow: 0 0 20px rgba(255, 50, 50, 0.8);
+  animation: flash-ring 1s infinite step-end;
+}
+
+/* Ensure the avatar stays above the background */
+.avatar-image {
+  position: relative;
+  z-index: 2;
+  background-color: #121212; 
+}
+
+/* --- Animations --- */
+@keyframes spin-ring {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.5; }
+}
+
+@keyframes flash-ring {
+  0%, 100% { opacity: 1; border-color: rgba(255, 50, 50, 1); }
+  50% { opacity: 0.2; border-color: rgba(255, 50, 50, 0.2); }
+}
