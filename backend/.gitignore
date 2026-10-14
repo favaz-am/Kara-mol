@@ -1,0 +1,18 @@
+# Secret Environment Variables (CRITICAL for Public Repos)
+.env
+.env.*
+!.env.example
+
+# Python Bytecode and Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Editor & OS files
+.vscode/
+.DS_Store
